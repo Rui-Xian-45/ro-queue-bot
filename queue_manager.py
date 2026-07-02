@@ -49,15 +49,13 @@ class QueueManager:
 
     def finish_run(self):
 
-    members = self.data["members"]
-    i = self.data["current_index"]
+        members = self.data["members"]
+        i = self.data["current_index"]
 
-    # 推進 index
-    self.data["current_index"] += 3
+        self.data["current_index"] += 3
 
-    # 超過就處理
-    if self.data["current_index"] >= len(members):
-        self.data["current_index"] = len(members)  # 停在尾端
+        if self.data["current_index"] >= len(members):
+            self.data["current_index"] = len(members)
 
     
     # =====================
