@@ -132,7 +132,7 @@ async def leave(interaction: discord.Interaction):
 # =====================
 # FINISH（修正版）
 # =====================
-@bot.tree.command(name="finish", description="完成副本（3人推進）")
+@bot.tree.command(name="finish", description="完成副本")
 async def finish(interaction: discord.Interaction):
 
     if not interaction.user.guild_permissions.administrator:
@@ -144,7 +144,16 @@ async def finish(interaction: discord.Interaction):
     current = members[i:i+3]
     next_group = members[i+3:i+6]
 
-    queue.finish_run()
+    # =====================
+    # 推進 index（移除副本中）
+    # =====================
+    queue.data["current_index"] += 3
+
+    # =====================
+    # 如果超過就結束
+    # =====================
+    if queue.data["current_index"] >= len(members):
+        queue.data["current_index"] = len(members)
 
     # =====================
     # 下一組通知
@@ -153,10 +162,12 @@ async def finish(interaction: discord.Interaction):
         mentions = " ".join([f"<@{uid}>" for uid in next_group])
         await interaction.channel.send(f"🔥 下一組進副本：{mentions}")
     else:
-        await interaction.channel.send("🏁 已無下一組，副本結束")
+        await interaction.channel.send("🏁 已無下一組")
 
-    await interaction.response.send_message("✅ 副本完成", ephemeral=True)
+    await interaction.response.send_message("✅ 已完成副本", ephemeral=True)
 
+    # ⭐ 強制刷新 UI（解決「卡住」問題）
+    await update_panel()
 
 # =====================
 # KICK
