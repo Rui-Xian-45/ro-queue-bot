@@ -111,6 +111,15 @@ class QueueView(discord.ui.View):
             view=KickView(),
             ephemeral=True
         )
+    @discord.ui.button(label="🏁 完成副本", style=discord.ButtonStyle.green)
+    async def finish(self, interaction, button):
+
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ 無權限", ephemeral=True)
+
+            queue.finish_run()
+
+            await interaction.response.send_message("🏁 已完成副本（隊伍已清空）", ephemeral=True)
 
 
 def get_persistent_views():
