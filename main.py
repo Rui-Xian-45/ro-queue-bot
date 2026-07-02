@@ -18,7 +18,6 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 queue = QueueManager()
-queue_view = None
 
 
 # =====================
@@ -26,14 +25,17 @@ queue_view = None
 # =====================
 @bot.event
 async def on_ready():
-    global queue_view
 
     print(f"✅ Logged in as {bot.user}")
 
-    queue_view = QueueView(queue)
+    # ⭐ Persistent View（安全版）
+    try:
+        bot.add_view(QueueView(queue))
+        print("✅ View registered")
+    except Exception as e:
+        print("❌ view error:", e)
 
-    bot.add_view(queue_view)
-
+    # Slash sync
     try:
         await bot.tree.sync()
         print("✅ Slash commands synced")
@@ -56,11 +58,9 @@ async def update_panel():
     try:
         msg = await channel.fetch_message(queue.data["message_id"])
 
-        guild = channel.guild
-
         await msg.edit(
-            embed=build_embed(queue, guild),
-            view=queue_view
+            embed=build_embed(queue, channel.guild),
+            view=QueueView(queue)
         )
 
     except Exception as e:
@@ -68,7 +68,7 @@ async def update_panel():
 
 
 # =====================
-# AUTO WRAPPER
+# AUTO UPDATE WRAPPER
 # =====================
 def wrap(func):
     def inner(*args, **kwargs):
@@ -85,6 +85,7 @@ def wrap(func):
 
 queue.add_player = wrap(queue.add_player)
 queue.remove_player = wrap(queue.remove_player)
+queue.finish_run = wrap(queue.finish_run)
 queue.kick_player = wrap(queue.kick_player)
 
 
@@ -129,14 +130,12 @@ async def leave(interaction: discord.Interaction):
 
 
 # =====================
-# FINISH（🔥 已修正核心）
+# FINISH（修正版）
 # =====================
-@bot.tree.command(name="finish", description="完成副本（推進3人）")
+@bot.tree.command(name="finish", description="完成副本（3人推進）")
 async def finish(interaction: discord.Interaction):
 
-    if not (
-        interaction.user.guild_permissions.administrator
-    ):
+    if not interaction.user.guild_permissions.administrator:
         return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
     members = queue.data["members"]
@@ -145,7 +144,6 @@ async def finish(interaction: discord.Interaction):
     current = members[i:i+3]
     next_group = members[i+3:i+6]
 
-    # 👉 推進
     queue.finish_run()
 
     # =====================
@@ -153,17 +151,11 @@ async def finish(interaction: discord.Interaction):
     # =====================
     if next_group:
         mentions = " ".join([f"<@{uid}>" for uid in next_group])
-
-        await interaction.channel.send(
-            f"🔥 下一組進副本：{mentions}"
-        )
+        await interaction.channel.send(f"🔥 下一組進副本：{mentions}")
     else:
         await interaction.channel.send("🏁 已無下一組，副本結束")
 
-    await interaction.response.send_message(
-        "✅ 副本已完成",
-        ephemeral=True
-    )
+    await interaction.response.send_message("✅ 副本完成", ephemeral=True)
 
 
 # =====================
@@ -176,6 +168,7 @@ async def kick(interaction: discord.Interaction, user: discord.Member):
         return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
     queue.kick_player(user.id)
+
     await interaction.response.send_message(
         f"👢 已踢 {user.display_name}",
         ephemeral=True
@@ -190,7 +183,7 @@ async def setup(interaction: discord.Interaction):
 
     msg = await interaction.channel.send(
         embed=build_embed(queue, interaction.guild),
-        view=queue_view
+        view=QueueView(queue)
     )
 
     queue.data["message_id"] = msg.id
