@@ -56,7 +56,7 @@ async def update_panel():
 
     try:
         msg = await channel.fetch_message(queue.data["message_id"])
-        await msg.edit(embed=build_embed(queue), view=queue_view)
+        await msg.edit(embed=build_embed(queue, interaction.guild), view=queue_view)
     except Exception as e:
         print("update error:", e)
 
@@ -140,7 +140,7 @@ async def kick(interaction: discord.Interaction, user: discord.Member):
 async def setup(interaction: discord.Interaction):
 
     msg = await interaction.channel.send(
-        embed=build_embed(queue),
+        embed=build_embed(queue, interaction.guild),
         view=queue_view
     )
 
