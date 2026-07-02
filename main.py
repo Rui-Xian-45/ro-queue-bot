@@ -42,7 +42,7 @@ async def on_ready():
 
 
 # =====================
-# UI UPDATE（🔥 修正重點）
+# UI UPDATE
 # =====================
 async def update_panel():
 
@@ -56,7 +56,7 @@ async def update_panel():
     try:
         msg = await channel.fetch_message(queue.data["message_id"])
 
-        guild = channel.guild  # ⭐ FIX：正確取得 guild
+        guild = channel.guild
 
         await msg.edit(
             embed=build_embed(queue, guild),
@@ -85,14 +85,12 @@ def wrap(func):
 
 queue.add_player = wrap(queue.add_player)
 queue.remove_player = wrap(queue.remove_player)
-queue.finish_run = wrap(queue.finish_run)
 queue.kick_player = wrap(queue.kick_player)
 
 
 # =====================
-# SLASH COMMANDS
+# HELP
 # =====================
-
 @bot.tree.command(name="help", description="顯示所有指令")
 async def help_cmd(interaction: discord.Interaction):
 
@@ -102,6 +100,9 @@ async def help_cmd(interaction: discord.Interaction):
     )
 
 
+# =====================
+# JOIN
+# =====================
 @bot.tree.command(name="join", description="加入排隊")
 async def join(interaction: discord.Interaction):
 
@@ -117,6 +118,9 @@ async def join(interaction: discord.Interaction):
     await interaction.response.send_message("✅ 已加入", ephemeral=True)
 
 
+# =====================
+# LEAVE
+# =====================
 @bot.tree.command(name="leave", description="離開排隊")
 async def leave(interaction: discord.Interaction):
 
@@ -124,16 +128,47 @@ async def leave(interaction: discord.Interaction):
     await interaction.response.send_message("✅ 已離開", ephemeral=True)
 
 
-@bot.tree.command(name="finish", description="完成副本（3人）")
+# =====================
+# FINISH（🔥 已修正核心）
+# =====================
+@bot.tree.command(name="finish", description="完成副本（推進3人）")
 async def finish(interaction: discord.Interaction):
 
-    if not interaction.user.guild_permissions.administrator:
+    if not (
+        interaction.user.guild_permissions.administrator
+    ):
         return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
+    members = queue.data["members"]
+    i = queue.data["current_index"]
+
+    current = members[i:i+3]
+    next_group = members[i+3:i+6]
+
+    # 👉 推進
     queue.finish_run()
-    await interaction.response.send_message("🏁 已推進 3 人", ephemeral=True)
+
+    # =====================
+    # 下一組通知
+    # =====================
+    if next_group:
+        mentions = " ".join([f"<@{uid}>" for uid in next_group])
+
+        await interaction.channel.send(
+            f"🔥 下一組進副本：{mentions}"
+        )
+    else:
+        await interaction.channel.send("🏁 已無下一組，副本結束")
+
+    await interaction.response.send_message(
+        "✅ 副本已完成",
+        ephemeral=True
+    )
 
 
+# =====================
+# KICK
+# =====================
 @bot.tree.command(name="kick", description="踢人")
 async def kick(interaction: discord.Interaction, user: discord.Member):
 
@@ -141,14 +176,20 @@ async def kick(interaction: discord.Interaction, user: discord.Member):
         return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
     queue.kick_player(user.id)
-    await interaction.response.send_message(f"👢 已踢 {user.display_name}", ephemeral=True)
+    await interaction.response.send_message(
+        f"👢 已踢 {user.display_name}",
+        ephemeral=True
+    )
 
 
+# =====================
+# SETUP
+# =====================
 @bot.tree.command(name="setup", description="建立排隊面板")
 async def setup(interaction: discord.Interaction):
 
     msg = await interaction.channel.send(
-        embed=build_embed(queue, interaction.guild),  # ✔ 正確
+        embed=build_embed(queue, interaction.guild),
         view=queue_view
     )
 
