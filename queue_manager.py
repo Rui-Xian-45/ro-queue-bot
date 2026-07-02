@@ -2,7 +2,7 @@ import json
 
 
 class QueueManager:
-    def __init__(self, file_path="data.json", max_size=60, group_size=3):
+    def __init__(self, file_path="data.json", max_size=25, group_size=3):
         self.file_path = file_path
         self.max_size = max_size
         self.group_size = group_size
@@ -16,6 +16,10 @@ class QueueManager:
         }
 
         self.load()
+
+    # =========================
+    # IO
+    # =========================
 
     def load(self):
         try:
@@ -49,15 +53,35 @@ class QueueManager:
     def remove_player(self, user_id):
         if user_id in self.data["queue"]:
             self.data["queue"].remove(user_id)
-            self.save()
-            return True
 
         if user_id in self.data["current"]:
             self.data["current"].remove(user_id)
-            self.save()
-            return True
 
-        return False
+        self.save()
+
+    # =========================
+    # 副本開始
+    # =========================
+
+    def next_group(self):
+        self.data["current"] = self.data["queue"][:self.group_size]
+        self.data["queue"] = self.data["queue"][self.group_size:]
+        self.save()
+
+        return self.data["current"]
+
+    # =========================
+    # 🔥 新增：完成副本
+    # =========================
+
+    def finish_run(self):
+        """
+        current → 完成並移除
+        """
+        finished = self.data["current"]
+        self.data["current"] = []
+        self.save()
+        return finished
 
     # =========================
     # 管理功能
@@ -69,12 +93,6 @@ class QueueManager:
             self.save()
             return True
         return False
-
-    def next_group(self):
-        self.data["current"] = self.data["queue"][:self.group_size]
-        self.data["queue"] = self.data["queue"][self.group_size:]
-        self.save()
-        return self.data["current"]
 
     def clear(self):
         self.data["queue"] = []
