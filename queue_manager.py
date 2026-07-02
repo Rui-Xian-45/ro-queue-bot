@@ -1,120 +1,77 @@
-import json
-
-
 class QueueManager:
-    def __init__(self, file_path="data.json", max_size=25, group_size=3):
-        self.file_path = file_path
-        self.max_size = max_size
-        self.group_size = group_size
-
+    def __init__(self):
         self.data = {
-            "queue": [],
-            "current": [],
+            "owner_id": None,
+            "members": [],
             "locked": False,
+            "current_index": 0,
             "message_id": None,
             "channel_id": None
         }
 
-        self.load()
+    # =====================
+    # 建房
+    # =====================
+    def create_room(self, owner_id):
+        self.data["owner_id"] = owner_id
+        self.data["members"] = []
+        self.data["current_index"] = 0
 
-    # =========================
-    # IO
-    # =========================
-
-    def load(self):
-        try:
-            with open(self.file_path, "r", encoding="utf-8") as f:
-                self.data = json.load(f)
-        except:
-            self.save()
-
-    def save(self):
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=2)
-
-    # =========================
-    # 玩家操作
-    # =========================
-
+    # =====================
+    # 加入
+    # =====================
     def add_player(self, user_id):
+
         if self.data["locked"]:
             return "locked"
 
-        if user_id in self.data["queue"] or user_id in self.data["current"]:
+        if user_id in self.data["members"]:
             return "exists"
 
-        if len(self.data["queue"]) + len(self.data["current"]) >= self.max_size:
+        if len(self.data["members"]) >= 25:
             return "full"
 
-        self.data["queue"].append(user_id)
-        self.save()
+        self.data["members"].append(user_id)
         return "ok"
 
+    # =====================
+    # 離開
+    # =====================
     def remove_player(self, user_id):
-        if user_id in self.data["queue"]:
-            self.data["queue"].remove(user_id)
+        if user_id in self.data["members"]:
+            self.data["members"].remove(user_id)
 
-        if user_id in self.data["current"]:
-            self.data["current"].remove(user_id)
+    # =====================
+    # 當前 3 人
+    # =====================
+    def get_current_group(self):
+        i = self.data["current_index"]
+        return self.data["members"][i:i+3]
 
-        self.save()
-
-    # =========================
-    # 副本開始
-    # =========================
-
-    def next_group(self):
-        self.data["current"] = self.data["queue"][:self.group_size]
-        self.data["queue"] = self.data["queue"][self.group_size:]
-        self.save()
-
-        return self.data["current"]
-
-    # =========================
-    # 🔥 新增：完成副本
-    # =========================
-
+    # =====================
+    # 完成副本（3人一組前進）
+    # =====================
     def finish_run(self):
-        """
-        current → 完成並移除
-        """
-        finished = self.data["current"]
-        self.data["current"] = []
-        self.save()
-        return finished
+        self.data["current_index"] += 3
 
-    # =========================
-    # 管理功能
-    # =========================
+        # 如果超過就重置
+        if self.data["current_index"] >= len(self.data["members"]):
+            self.data["current_index"] = 0
 
+    # =====================
+    # 踢人
+    # =====================
     def kick_player(self, user_id):
-        if user_id in self.data["queue"]:
-            self.data["queue"].remove(user_id)
-            self.save()
+        if user_id in self.data["members"]:
+            self.data["members"].remove(user_id)
             return True
         return False
 
-    def clear(self):
-        self.data["queue"] = []
-        self.data["current"] = []
-        self.save()
-
+    # =====================
+    # 鎖房
+    # =====================
     def lock(self):
         self.data["locked"] = True
-        self.save()
 
     def unlock(self):
         self.data["locked"] = False
-        self.save()
-
-    # =========================
-    # 查詢
-    # =========================
-
-    def status(self):
-        return {
-            "queue": self.data["queue"],
-            "current": self.data["current"],
-            "size": len(self.data["queue"]) + len(self.data["current"]),
-            "locked": self.data["locked"]
-        }
