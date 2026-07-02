@@ -1,72 +1,3 @@
-import discord
-from queue_manager import QueueManager
-
-queue = QueueManager()
-
-
-# =========================
-# Kick 選單（動態版本）
-# =========================
-
-class KickSelect(discord.ui.Select):
-    def __init__(self, options):
-        super().__init__(
-            placeholder="選擇要踢出的玩家",
-            min_values=1,
-            max_values=1,
-            options=options
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-
-        if not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("❌ 沒權限", ephemeral=True)
-
-        value = self.values[0]
-
-        if value == "none":
-            return await interaction.response.send_message("⚠ 沒有可踢玩家", ephemeral=True)
-
-        user_id = int(value)
-
-        ok = queue.kick_player(user_id)
-
-        if ok:
-            await interaction.response.send_message("✅ 已踢出", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ 找不到玩家", ephemeral=True)
-
-
-class KickView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=30)
-
-        # 🔥 動態生成選單
-        if queue.data["queue"]:
-
-            options = [
-                discord.SelectOption(
-                    label=str(uid),
-                    value=str(uid)
-                )
-                for uid in queue.data["queue"][:25]
-            ]
-
-        else:
-            options = [
-                discord.SelectOption(
-                    label="（目前沒有玩家）",
-                    value="none"
-                )
-            ]
-
-        self.add_item(KickSelect(options))
-
-
-# =========================
-# 主 Queue View
-# =========================
-
 class QueueView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -74,7 +5,11 @@ class QueueView(discord.ui.View):
     # =====================
     # 加入
     # =====================
-    @discord.ui.button(label="🟢 加入", style=discord.ButtonStyle.green)
+    @discord.ui.button(
+        label="🟢 加入",
+        style=discord.ButtonStyle.green,
+        custom_id="queue_join"
+    )
     async def join(self, interaction, button):
 
         r = queue.add_player(interaction.user.id)
@@ -91,7 +26,11 @@ class QueueView(discord.ui.View):
     # =====================
     # 離開
     # =====================
-    @discord.ui.button(label="🔴 離開", style=discord.ButtonStyle.red)
+    @discord.ui.button(
+        label="🔴 離開",
+        style=discord.ButtonStyle.red,
+        custom_id="queue_leave"
+    )
     async def leave(self, interaction, button):
 
         queue.remove_player(interaction.user.id)
@@ -101,7 +40,11 @@ class QueueView(discord.ui.View):
     # =====================
     # 下一組
     # =====================
-    @discord.ui.button(label="▶ 下一組", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(
+        label="▶ 下一組",
+        style=discord.ButtonStyle.blurple,
+        custom_id="queue_next"
+    )
     async def next(self, interaction, button):
 
         if not interaction.user.guild_permissions.administrator:
@@ -112,9 +55,13 @@ class QueueView(discord.ui.View):
         await interaction.response.send_message("🔔 已切換下一組", ephemeral=True)
 
     # =====================
-    # 踢人（選單）
+    # 踢人
     # =====================
-    @discord.ui.button(label="👢 踢人", style=discord.ButtonStyle.gray)
+    @discord.ui.button(
+        label="👢 踢人",
+        style=discord.ButtonStyle.gray,
+        custom_id="queue_kick"
+    )
     async def kick(self, interaction, button):
 
         if not interaction.user.guild_permissions.administrator:
@@ -127,9 +74,13 @@ class QueueView(discord.ui.View):
         )
 
     # =====================
-    # 完成副本（修復）
+    # 完成副本
     # =====================
-    @discord.ui.button(label="🏁 完成副本", style=discord.ButtonStyle.green)
+    @discord.ui.button(
+        label="🏁 完成副本",
+        style=discord.ButtonStyle.green,
+        custom_id="queue_finish"
+    )
     async def finish(self, interaction, button):
 
         if not interaction.user.guild_permissions.administrator:
@@ -141,7 +92,3 @@ class QueueView(discord.ui.View):
             "🏁 已完成副本（隊伍已清空）",
             ephemeral=True
         )
-
-
-def get_persistent_views():
-    return [QueueView()]
