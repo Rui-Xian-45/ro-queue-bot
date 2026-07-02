@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List
+from typing import List
 
 
 class QueueManager:
@@ -18,9 +18,6 @@ class QueueManager:
 
         self.load()
 
-    # -----------------------
-    # 基本資料處理
-    # -----------------------
     def load(self):
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
@@ -32,88 +29,50 @@ class QueueManager:
         with open(self.file_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
-    # -----------------------
-    # 狀態查詢
-    # -----------------------
-    def get_queue(self) -> List[str]:
+    def get_queue(self):
         return self.data["queue"]
 
-    def get_current(self) -> List[str]:
+    def get_current(self):
         return self.data["current"]
 
-    def is_locked(self) -> bool:
-        return self.data["locked"]
-
-    # -----------------------
-    # 加入隊列
-    # -----------------------
-    def add_player(self, user_name: str) -> str:
+    def add_player(self, name: str):
         if self.data["locked"]:
             return "locked"
 
-        if user_name in self.data["queue"] or user_name in self.data["current"]:
+        if name in self.data["queue"] or name in self.data["current"]:
             return "exists"
 
         if len(self.data["queue"]) + len(self.data["current"]) >= self.max_size:
             return "full"
 
-        self.data["queue"].append(user_name)
+        self.data["queue"].append(name)
         self.save()
         return "ok"
 
-    # -----------------------
-    # 離開隊列
-    # -----------------------
-    def remove_player(self, user_name: str) -> bool:
-        if user_name in self.data["queue"]:
-            self.data["queue"].remove(user_name)
+    def remove_player(self, name: str):
+        if name in self.data["queue"]:
+            self.data["queue"].remove(name)
             self.save()
             return True
 
-        if user_name in self.data["current"]:
-            self.data["current"].remove(user_name)
+        if name in self.data["current"]:
+            self.data["current"].remove(name)
             self.save()
             return True
 
         return False
 
-    # -----------------------
-    # 下一組（核心）
-    # -----------------------
-    def next_group(self) -> List[str]:
-        self.data["current"] = []
-
-        next_players = self.data["queue"][:self.group_size]
-        self.data["current"] = next_players
-
+    def next_group(self):
+        self.data["current"] = self.data["queue"][:self.group_size]
         self.data["queue"] = self.data["queue"][self.group_size:]
-
         self.save()
-        return next_players
+        return self.data["current"]
 
-    # -----------------------
-    # 剔除玩家（管理員）
-    # -----------------------
-    def kick_player(self, user_name: str):
-        if user_name in self.data["queue"]:
-            self.data["queue"].remove(user_name)
-
-        if user_name in self.data["current"]:
-            self.data["current"].remove(user_name)
-
-        self.save()
-
-    # -----------------------
-    # 清空隊列
-    # -----------------------
     def clear(self):
         self.data["queue"] = []
         self.data["current"] = []
         self.save()
 
-    # -----------------------
-    # 鎖定 / 解鎖
-    # -----------------------
     def lock(self):
         self.data["locked"] = True
         self.save()
@@ -122,16 +81,10 @@ class QueueManager:
         self.data["locked"] = False
         self.save()
 
-    # -----------------------
-    # 統計
-    # -----------------------
-    def size(self):
-        return len(self.data["queue"]) + len(self.data["current"])
-
     def status(self):
         return {
-            "current": self.data["current"],
             "queue": self.data["queue"],
-            "size": self.size(),
+            "current": self.data["current"],
+            "size": len(self.data["queue"]) + len(self.data["current"]),
             "locked": self.data["locked"]
         }
