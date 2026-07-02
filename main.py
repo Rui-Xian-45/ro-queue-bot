@@ -114,4 +114,8 @@ async def setup(ctx):
 # =========================
 
 TOKEN = os.getenv("DISCORD_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError("❌ DISCORD_TOKEN 沒有設定（請檢查 Railway Variables）")
+
 bot.run(TOKEN)
