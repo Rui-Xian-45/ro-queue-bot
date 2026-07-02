@@ -1,79 +1,62 @@
 import discord
-from queue_manager import QueueManager
-
-queue = QueueManager()
-
 
 class QueueView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, queue):
         super().__init__(timeout=None)
+        self.queue = queue
 
-    @discord.ui.button(
-        label="🟢 加入",
-        style=discord.ButtonStyle.green,
-        custom_id="queue:join"
-    )
-    async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
+    # =====================
+    # 加入
+    # =====================
+    @discord.ui.button(label="加入", style=discord.ButtonStyle.green, custom_id="join")
+    async def join(self, interaction, button):
 
-        r = queue.add_player(interaction.user.id)
+        r = self.queue.add_player(interaction.user.id)
 
-        if r == "locked":
-            return await interaction.response.send_message("❌ 已鎖定", ephemeral=True)
-        if r == "exists":
-            return await interaction.response.send_message("❌ 已在隊列", ephemeral=True)
         if r == "full":
-            return await interaction.response.send_message("❌ 隊列已滿（25人）", ephemeral=True)
+            return await interaction.response.send_message("❌ 滿了", ephemeral=True)
+        if r == "exists":
+            return await interaction.response.send_message("❌ 已在隊伍", ephemeral=True)
+        if r == "locked":
+            return await interaction.response.send_message("❌ 已鎖房", ephemeral=True)
 
         await interaction.response.send_message("✅ 已加入", ephemeral=True)
 
-    @discord.ui.button(
-        label="🔴 離開",
-        style=discord.ButtonStyle.red,
-        custom_id="queue:leave"
-    )
-    async def leave(self, interaction: discord.Interaction, button: discord.ui.Button):
+    # =====================
+    # 離開
+    # =====================
+    @discord.ui.button(label="離開", style=discord.ButtonStyle.red, custom_id="leave")
+    async def leave(self, interaction, button):
 
-        queue.remove_player(interaction.user.id)
+        self.queue.remove_player(interaction.user.id)
         await interaction.response.send_message("✅ 已離開", ephemeral=True)
 
-    @discord.ui.button(
-        label="▶ 下一組",
-        style=discord.ButtonStyle.blurple,
-        custom_id="queue:next"
-    )
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+    # =====================
+    # 完成副本
+    # =====================
+    @discord.ui.button(label="完成副本", style=discord.ButtonStyle.blurple, custom_id="finish")
+    async def finish(self, interaction, button):
 
-        if not interaction.user.guild_permissions.administrator:
+        if not (
+            interaction.user.guild_permissions.administrator or
+            self.queue.is_admin(interaction.user.id)
+        ):
             return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
-        queue.next_group()
-        await interaction.response.send_message("🔔 已切換下一組", ephemeral=True)
+        self.queue.finish_run()
 
-    @discord.ui.button(
-        label="👢 踢人",
-        style=discord.ButtonStyle.gray,
-        custom_id="queue:kick"
-    )
-    async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🏁 已推進 3 人", ephemeral=True)
 
-        if not interaction.user.guild_permissions.administrator:
+    # =====================
+    # 踢人（簡化）
+    # =====================
+    @discord.ui.button(label="踢人", style=discord.ButtonStyle.gray, custom_id="kick")
+    async def kick(self, interaction, button):
+
+        if not (
+            interaction.user.guild_permissions.administrator or
+            self.queue.is_admin(interaction.user.id)
+        ):
             return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
-        await interaction.response.send_message("請選擇要踢出的玩家", view=KickView(), ephemeral=True)
-
-    @discord.ui.button(
-        label="🏁 完成副本",
-        style=discord.ButtonStyle.green,
-        custom_id="queue:finish"
-    )
-    async def finish(self, interaction: discord.Interaction, button: discord.ui.Button):
-
-        if not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("❌ 無權限", ephemeral=True)
-
-        queue.finish_run()
-        await interaction.response.send_message("🏁 已完成副本（隊伍已清空）", ephemeral=True)
-
-
-def get_persistent_views():
-    return [QueueView()]
+        await interaction.response.send_message("請使用指令踢人（後續可升級 UI）", ephemeral=True)
