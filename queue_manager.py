@@ -1,9 +1,8 @@
 import json
-from typing import List
 
 
 class QueueManager:
-    def __init__(self, file_path="data.json", max_size=30, group_size=3):
+    def __init__(self, file_path="data.json", max_size=60, group_size=3):
         self.file_path = file_path
         self.max_size = max_size
         self.group_size = group_size
@@ -29,37 +28,46 @@ class QueueManager:
         with open(self.file_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
-    def get_queue(self):
-        return self.data["queue"]
+    # =========================
+    # 玩家操作
+    # =========================
 
-    def get_current(self):
-        return self.data["current"]
-
-    def add_player(self, name: str):
+    def add_player(self, user_id):
         if self.data["locked"]:
             return "locked"
 
-        if name in self.data["queue"] or name in self.data["current"]:
+        if user_id in self.data["queue"] or user_id in self.data["current"]:
             return "exists"
 
         if len(self.data["queue"]) + len(self.data["current"]) >= self.max_size:
             return "full"
 
-        self.data["queue"].append(name)
+        self.data["queue"].append(user_id)
         self.save()
         return "ok"
 
-    def remove_player(self, name: str):
-        if name in self.data["queue"]:
-            self.data["queue"].remove(name)
+    def remove_player(self, user_id):
+        if user_id in self.data["queue"]:
+            self.data["queue"].remove(user_id)
             self.save()
             return True
 
-        if name in self.data["current"]:
-            self.data["current"].remove(name)
+        if user_id in self.data["current"]:
+            self.data["current"].remove(user_id)
             self.save()
             return True
 
+        return False
+
+    # =========================
+    # 管理功能
+    # =========================
+
+    def kick_player(self, user_id):
+        if user_id in self.data["queue"]:
+            self.data["queue"].remove(user_id)
+            self.save()
+            return True
         return False
 
     def next_group(self):
@@ -80,6 +88,10 @@ class QueueManager:
     def unlock(self):
         self.data["locked"] = False
         self.save()
+
+    # =========================
+    # 查詢
+    # =========================
 
     def status(self):
         return {
