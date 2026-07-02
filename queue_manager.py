@@ -2,37 +2,17 @@ class QueueManager:
     def __init__(self):
         self.data = {
             "members": [],
-            "room_admins": [],
             "locked": False,
             "current_index": 0,
             "message_id": None,
             "channel_id": None,
-            "room_created": False
         }
 
     # =====================
-    # 房間
-    # =====================
-    def create_room(self, owner_id=None):
-        self.data["members"] = []
-        self.data["room_admins"] = [owner_id] if owner_id else []
-        self.data["current_index"] = 0
-        self.data["locked"] = False
-
-    # =====================
-    # admin
-    # =====================
-    def add_room_admin(self, user_id):
-        if user_id not in self.data["room_admins"]:
-            self.data["room_admins"].append(user_id)
-
-    def is_admin(self, user_id):
-        return user_id in self.data["room_admins"]
-
-    # =====================
-    # queue
+    # 加入
     # =====================
     def add_player(self, user_id):
+
         if self.data["locked"]:
             return "locked"
 
@@ -45,15 +25,21 @@ class QueueManager:
         self.data["members"].append(user_id)
         return "ok"
 
+    # =====================
+    # 離開
+    # =====================
     def remove_player(self, user_id):
         if user_id in self.data["members"]:
             self.data["members"].remove(user_id)
 
+    # =====================
+    # 踢人
+    # =====================
     def kick_player(self, user_id):
-        return self.remove_player(user_id)
+        self.remove_player(user_id)
 
     # =====================
-    # 副本（3人）
+    # 3人副本
     # =====================
     def get_current_group(self):
         i = self.data["current_index"]
