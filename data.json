@@ -1,1 +1,7 @@
-
+{
+  "queue": [],
+  "current": [],
+  "locked": false,
+  "message_id": null,
+  "channel_id": null
+}
