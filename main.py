@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
 import asyncio
 
@@ -20,6 +21,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 queue = QueueManager()
 
+# ⭐ 全域單一 View（重要：避免炸 persistent view）
+queue_view = QueueView()
+
 
 # =========================
 # UI 更新
@@ -39,7 +43,7 @@ async def update_panel():
 
         await msg.edit(
             embed=build_embed(),
-            view=QueueView()   # ✅ 每次重新建立（安全）
+            view=queue_view   # ⭐ 固定 instance
         )
 
     except Exception as e:
@@ -47,7 +51,7 @@ async def update_panel():
 
 
 # =========================
-# AUTO UPDATE HOOK（安全版）
+# AUTO UPDATE HOOK
 # =========================
 
 def wrap(func):
@@ -55,7 +59,6 @@ def wrap(func):
     def inner(*args, **kwargs):
         result = func(*args, **kwargs)
 
-        # ⚠ 避免 loop not ready crash
         try:
             asyncio.get_running_loop().create_task(update_panel())
         except RuntimeError:
@@ -75,6 +78,40 @@ queue.unlock = wrap(queue.unlock)
 
 
 # =========================
+# Slash /help
+# =========================
+
+@bot.tree.command(name="help", description="顯示所有 RO 排隊指令")
+async def help_cmd(interaction: discord.Interaction):
+
+    embed = discord.Embed(
+        title="📌 RO 排隊系統",
+        color=discord.Color.green()
+    )
+
+    embed.add_field(
+        name="🏠 基本操作",
+        value=(
+            "🟢 加入：加入排隊\n"
+            "🔴 離開：退出排隊\n"
+            "🏁 完成副本：推進 3 人"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="👑 管理員",
+        value=(
+            "!setup 建立排隊面板\n"
+            "踢人 / 鎖房（管理功能）"
+        ),
+        inline=False
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+# =========================
 # Bot 啟動
 # =========================
 
@@ -82,8 +119,15 @@ queue.unlock = wrap(queue.unlock)
 async def on_ready():
     print(f"✅ {bot.user}")
 
-    # ✅ Persistent Views（正確位置）
-    bot.add_view(QueueView())
+    # ⭐ Persistent View（只註冊一次）
+    bot.add_view(queue_view)
+
+    # ⭐ Slash 同步（關鍵）
+    try:
+        await bot.tree.sync()
+        print("✅ Slash commands synced")
+    except Exception as e:
+        print("⚠ sync error:", e)
 
 
 # =========================
@@ -99,14 +143,14 @@ async def setup(ctx):
 
     msg = await ctx.send(
         embed=build_embed(),
-        view=QueueView()
+        view=queue_view
     )
 
     queue.data["message_id"] = msg.id
     queue.data["channel_id"] = ctx.channel.id
     queue.save()
 
-    await ctx.send("✅ V1.2 排隊系統完成")
+    await ctx.send("✅ 排隊系統完成")
 
 
 # =========================
