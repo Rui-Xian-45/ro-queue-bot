@@ -10,7 +10,7 @@ from queue_manager import QueueManager
 
 
 # =========================
-# Bot 基本設定
+# BOT SETUP
 # =========================
 
 intents = discord.Intents.default()
@@ -20,9 +20,31 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 queue = QueueManager()
+queue_view = QueueView(queue)
 
-# ⭐ 全域單一 View（重要：避免炸 persistent view）
-queue_view = QueueView()
+
+# =========================
+# 啟動自動建房（單一房間）
+# =========================
+
+@bot.event
+async def on_ready():
+    print(f"✅ {bot.user}")
+
+    # ⭐ 自動建立單一房間（只做一次）
+    if not queue.data.get("room_created"):
+        queue.create_room(owner_id=None)  # 無特定房主（全服房）
+        queue.data["room_created"] = True
+
+    # ⭐ persistent view
+    bot.add_view(queue_view)
+
+    # ⭐ slash sync
+    try:
+        await bot.tree.sync()
+        print("✅ Slash synced")
+    except Exception as e:
+        print("⚠ sync error:", e)
 
 
 # =========================
@@ -42,8 +64,8 @@ async def update_panel():
         msg = await channel.fetch_message(queue.data["message_id"])
 
         await msg.edit(
-            embed=build_embed(),
-            view=queue_view   # ⭐ 固定 instance
+            embed=build_embed(queue),
+            view=queue_view
         )
 
     except Exception as e:
@@ -51,11 +73,10 @@ async def update_panel():
 
 
 # =========================
-# AUTO UPDATE HOOK
+# HOOK（自動更新 UI）
 # =========================
 
 def wrap(func):
-
     def inner(*args, **kwargs):
         result = func(*args, **kwargs)
 
@@ -65,36 +86,42 @@ def wrap(func):
             pass
 
         return result
-
     return inner
 
 
 queue.add_player = wrap(queue.add_player)
 queue.remove_player = wrap(queue.remove_player)
 queue.next_group = wrap(queue.next_group)
-queue.clear = wrap(queue.clear)
-queue.lock = wrap(queue.lock)
-queue.unlock = wrap(queue.unlock)
+queue.finish_run = wrap(queue.finish_run)
+queue.kick_player = wrap(queue.kick_player)
 
 
 # =========================
-# Slash /help
+# /HELP
 # =========================
 
-@bot.tree.command(name="help", description="顯示所有 RO 排隊指令")
+@bot.tree.command(name="help", description="顯示所有指令")
 async def help_cmd(interaction: discord.Interaction):
 
     embed = discord.Embed(
-        title="📌 RO 排隊系統",
+        title="📌 RO 副本排隊系統",
         color=discord.Color.green()
     )
 
     embed.add_field(
-        name="🏠 基本操作",
+        name="🎮 玩家指令",
         value=(
-            "🟢 加入：加入排隊\n"
-            "🔴 離開：退出排隊\n"
-            "🏁 完成副本：推進 3 人"
+            "🟢 加入排隊\n"
+            "🔴 退出排隊\n"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="⚔ 副本系統",
+        value=(
+            "🏁 完成副本（每次 3 人）\n"
+            "顯示：副本中 / 排隊中 / 完成"
         ),
         inline=False
     )
@@ -102,32 +129,13 @@ async def help_cmd(interaction: discord.Interaction):
     embed.add_field(
         name="👑 管理員",
         value=(
-            "!setup 建立排隊面板\n"
-            "踢人 / 鎖房（管理功能）"
+            "踢人 / 鎖房 / 授權管理員\n"
+            "!setup 建立面板"
         ),
         inline=False
     )
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-# =========================
-# Bot 啟動
-# =========================
-
-@bot.event
-async def on_ready():
-    print(f"✅ {bot.user}")
-
-    # ⭐ Persistent View（只註冊一次）
-    bot.add_view(queue_view)
-
-    # ⭐ Slash 同步（關鍵）
-    try:
-        await bot.tree.sync()
-        print("✅ Slash commands synced")
-    except Exception as e:
-        print("⚠ sync error:", e)
 
 
 # =========================
@@ -138,28 +146,24 @@ async def on_ready():
 @commands.has_permissions(administrator=True)
 async def setup(ctx):
 
-    if queue.data["message_id"]:
-        return await ctx.send("⚠ 已建立")
-
     msg = await ctx.send(
-        embed=build_embed(),
+        embed=build_embed(queue),
         view=queue_view
     )
 
     queue.data["message_id"] = msg.id
     queue.data["channel_id"] = ctx.channel.id
-    queue.save()
 
-    await ctx.send("✅ 排隊系統完成")
+    await ctx.send("✅ RO 排隊系統已啟動")
 
 
 # =========================
-# Token
+# TOKEN
 # =========================
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
-    raise RuntimeError("❌ DISCORD_TOKEN 沒有設定（請檢查 Railway Variables）")
+    raise RuntimeError("❌ DISCORD_TOKEN 沒設定")
 
 bot.run(TOKEN)
