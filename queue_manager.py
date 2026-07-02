@@ -1,12 +1,13 @@
 class QueueManager:
     def __init__(self):
         self.data = {
-            "owner_id": None,
             "members": [],
+            "room_admins": [],
             "locked": False,
             "current_index": 0,
             "message_id": None,
-            "channel_id": None
+            "channel_id": None,
+            "owner_id": None
         }
 
     # =====================
@@ -15,6 +16,7 @@ class QueueManager:
     def create_room(self, owner_id):
         self.data["owner_id"] = owner_id
         self.data["members"] = []
+        self.data["room_admins"] = [owner_id]  # ⭐ 房主自動是管理員
         self.data["current_index"] = 0
 
     # =====================
@@ -49,12 +51,11 @@ class QueueManager:
         return self.data["members"][i:i+3]
 
     # =====================
-    # 完成副本（3人一組前進）
+    # 完成副本
     # =====================
     def finish_run(self):
         self.data["current_index"] += 3
 
-        # 如果超過就重置
         if self.data["current_index"] >= len(self.data["members"]):
             self.data["current_index"] = 0
 
@@ -75,3 +76,17 @@ class QueueManager:
 
     def unlock(self):
         self.data["locked"] = False
+
+    # =====================
+    # 授權管理員
+    # =====================
+    def add_room_admin(self, user_id):
+        if user_id not in self.data["room_admins"]:
+            self.data["room_admins"].append(user_id)
+
+    def remove_room_admin(self, user_id):
+        if user_id in self.data["room_admins"]:
+            self.data["room_admins"].remove(user_id)
+
+    def is_admin(self, user_id):
+        return user_id in self.data["room_admins"]
