@@ -7,23 +7,32 @@ class QueueManager:
             "current_index": 0,
             "message_id": None,
             "channel_id": None,
-            "owner_id": None
+            "room_created": False
         }
 
     # =====================
-    # 建房
+    # 房間
     # =====================
-    def create_room(self, owner_id):
-        self.data["owner_id"] = owner_id
+    def create_room(self, owner_id=None):
         self.data["members"] = []
-        self.data["room_admins"] = [owner_id]  # ⭐ 房主自動是管理員
+        self.data["room_admins"] = [owner_id] if owner_id else []
         self.data["current_index"] = 0
+        self.data["locked"] = False
 
     # =====================
-    # 加入
+    # admin
+    # =====================
+    def add_room_admin(self, user_id):
+        if user_id not in self.data["room_admins"]:
+            self.data["room_admins"].append(user_id)
+
+    def is_admin(self, user_id):
+        return user_id in self.data["room_admins"]
+
+    # =====================
+    # queue
     # =====================
     def add_player(self, user_id):
-
         if self.data["locked"]:
             return "locked"
 
@@ -36,23 +45,20 @@ class QueueManager:
         self.data["members"].append(user_id)
         return "ok"
 
-    # =====================
-    # 離開
-    # =====================
     def remove_player(self, user_id):
         if user_id in self.data["members"]:
             self.data["members"].remove(user_id)
 
+    def kick_player(self, user_id):
+        return self.remove_player(user_id)
+
     # =====================
-    # 當前 3 人
+    # 副本（3人）
     # =====================
     def get_current_group(self):
         i = self.data["current_index"]
         return self.data["members"][i:i+3]
 
-    # =====================
-    # 完成副本
-    # =====================
     def finish_run(self):
         self.data["current_index"] += 3
 
@@ -60,33 +66,10 @@ class QueueManager:
             self.data["current_index"] = 0
 
     # =====================
-    # 踢人
-    # =====================
-    def kick_player(self, user_id):
-        if user_id in self.data["members"]:
-            self.data["members"].remove(user_id)
-            return True
-        return False
-
-    # =====================
-    # 鎖房
+    # lock
     # =====================
     def lock(self):
         self.data["locked"] = True
 
     def unlock(self):
         self.data["locked"] = False
-
-    # =====================
-    # 授權管理員
-    # =====================
-    def add_room_admin(self, user_id):
-        if user_id not in self.data["room_admins"]:
-            self.data["room_admins"].append(user_id)
-
-    def remove_room_admin(self, user_id):
-        if user_id in self.data["room_admins"]:
-            self.data["room_admins"].remove(user_id)
-
-    def is_admin(self, user_id):
-        return user_id in self.data["room_admins"]
