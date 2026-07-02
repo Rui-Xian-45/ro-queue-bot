@@ -9,6 +9,10 @@ from views import QueueView
 from embeds import build_embed
 
 
+# =====================
+# BOT SETUP
+# =====================
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -16,12 +20,34 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 queue = QueueManager()
-queue_view = QueueView(queue)
+
+# ⚠️ 不要在這裡建立 View（會炸）
+queue_view = None
 
 
 # =====================
-# update UI
+# READY EVENT
 # =====================
+
+@bot.event
+async def on_ready():
+    global queue_view
+
+    print(f"✅ {bot.user}")
+
+    # ⭐ 這裡才建立 View（關鍵修正）
+    queue_view = QueueView(queue)
+
+    bot.add_view(queue_view)
+
+    await bot.tree.sync()
+    print("✅ Slash synced")
+
+
+# =====================
+# UI 更新
+# =====================
+
 async def update_panel():
 
     if not queue.data["message_id"]:
@@ -33,21 +59,29 @@ async def update_panel():
 
     try:
         msg = await channel.fetch_message(queue.data["message_id"])
-        await msg.edit(embed=build_embed(queue), view=queue_view)
-    except:
-        pass
+
+        await msg.edit(
+            embed=build_embed(queue),
+            view=queue_view
+        )
+
+    except Exception as e:
+        print("⚠ update_panel error:", e)
 
 
 # =====================
-# auto update
+# AUTO UPDATE HOOK
 # =====================
+
 def wrap(func):
     def inner(*args, **kwargs):
         result = func(*args, **kwargs)
+
         try:
             asyncio.get_running_loop().create_task(update_panel())
-        except:
+        except RuntimeError:
             pass
+
         return result
     return inner
 
@@ -58,20 +92,22 @@ queue.finish_run = wrap(queue.finish_run)
 
 
 # =====================
-# /help
+# HELP
 # =====================
+
 @bot.tree.command(name="help")
 async def help_cmd(interaction: discord.Interaction):
 
     await interaction.response.send_message(
-        "🟢 加入 / 🔴 離開 / 完成副本 / 踢人",
+        "🟢 加入 / 🔴 離開 / 🏁 完成副本 / 👢 踢人",
         ephemeral=True
     )
 
 
 # =====================
-# setup
+# SETUP
 # =====================
+
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def setup(ctx):
@@ -88,20 +124,12 @@ async def setup(ctx):
 
 
 # =====================
-# ready
+# TOKEN
 # =====================
-@bot.event
-async def on_ready():
-    print(f"✅ {bot.user}")
 
-    bot.add_view(queue_view)
-
-    await bot.tree.sync()
-
-
-# =====================
-# token
-# =====================
 TOKEN = os.getenv("DISCORD_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError("❌ DISCORD_TOKEN 沒設定")
 
 bot.run(TOKEN)
