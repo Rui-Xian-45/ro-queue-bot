@@ -18,9 +18,12 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 queue = QueueManager()
 
+# 👉 固定 View（避免重複 instance）
+main_view = QueueView()
+
 
 # =========================
-# STEP 1：更新畫面函式
+# 更新畫面
 # =========================
 
 async def update_panel():
@@ -37,7 +40,7 @@ async def update_panel():
 
         await msg.edit(
             embed=build_embed(),
-            view=QueueView()
+            view=main_view   # ✅ 固定 instance
         )
 
     except Exception as e:
@@ -45,23 +48,23 @@ async def update_panel():
 
 
 # =========================
-# STEP 2：Trigger 包裝器
+# STEP 2：安全 hook（修正版）
 # =========================
 
 def wrap(func):
-    async def async_wrapper(*args, **kwargs):
+    def sync_wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
 
-        # 自動更新 UI
-        await update_panel()
+        # async safe trigger
+        bot.loop.create_task(update_panel())
 
         return result
 
-    return async_wrapper
+    return sync_wrapper
 
 
 # =========================
-# STEP 3：掛載 QueueManager 自動更新
+# STEP 3：掛載 QueueManager
 # =========================
 
 queue.add_player = wrap(queue.add_player)
@@ -80,12 +83,11 @@ queue.unlock = wrap(queue.unlock)
 async def on_ready():
     print(f"✅ {bot.user}")
 
-    # Persistent View（重啟不壞按鈕）
-    bot.add_view(QueueView())
+    bot.add_view(main_view)  # ✅ persistent fixed view
 
 
 # =========================
-# 建立排隊面板
+# 建立面板
 # =========================
 
 @bot.command()
@@ -97,7 +99,7 @@ async def setup(ctx):
 
     msg = await ctx.send(
         embed=build_embed(),
-        view=QueueView()
+        view=main_view
     )
 
     queue.data["message_id"] = msg.id
@@ -108,7 +110,7 @@ async def setup(ctx):
 
 
 # =========================
-# 手動更新（保留備用）
+# 手動更新
 # =========================
 
 @bot.command()
