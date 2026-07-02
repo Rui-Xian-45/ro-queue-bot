@@ -9,7 +9,7 @@ from embeds import build_embed
 
 
 # =====================
-# BOT INIT（一定要最上面）
+# BOT INIT
 # =====================
 intents = discord.Intents.default()
 intents.message_content = True
@@ -30,7 +30,6 @@ async def on_ready():
 
     print(f"✅ Logged in as {bot.user}")
 
-    # ⭐ View 必須在這裡建立（避免 event loop error）
     queue_view = QueueView(queue)
 
     bot.add_view(queue_view)
@@ -43,7 +42,7 @@ async def on_ready():
 
 
 # =====================
-# UI UPDATE
+# UI UPDATE（🔥 修正重點）
 # =====================
 async def update_panel():
 
@@ -56,21 +55,30 @@ async def update_panel():
 
     try:
         msg = await channel.fetch_message(queue.data["message_id"])
-        await msg.edit(embed=build_embed(queue, interaction.guild), view=queue_view)
+
+        guild = channel.guild  # ⭐ FIX：正確取得 guild
+
+        await msg.edit(
+            embed=build_embed(queue, guild),
+            view=queue_view
+        )
+
     except Exception as e:
         print("update error:", e)
 
 
 # =====================
-# AUTO UPDATE WRAPPER
+# AUTO WRAPPER
 # =====================
 def wrap(func):
     def inner(*args, **kwargs):
         result = func(*args, **kwargs)
+
         try:
             asyncio.get_running_loop().create_task(update_panel())
         except:
             pass
+
         return result
     return inner
 
@@ -140,7 +148,7 @@ async def kick(interaction: discord.Interaction, user: discord.Member):
 async def setup(interaction: discord.Interaction):
 
     msg = await interaction.channel.send(
-        embed=build_embed(queue, interaction.guild),
+        embed=build_embed(queue, interaction.guild),  # ✔ 正確
         view=queue_view
     )
 
