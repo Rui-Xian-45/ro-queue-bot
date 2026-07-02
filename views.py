@@ -5,28 +5,16 @@ queue = QueueManager()
 
 
 # =========================
-# 玩家選單（踢人用）
+# Kick 選單（動態版本）
 # =========================
 
 class KickSelect(discord.ui.Select):
-    def __init__(self):
-
-        options = []
-
-        for uid in queue.data["queue"][:25]:
-            options.append(
-                discord.SelectOption(
-                    label=str(uid),
-                    value=str(uid)
-                )
-            )
-
+    def __init__(self, options):
         super().__init__(
             placeholder="選擇要踢出的玩家",
             min_values=1,
             max_values=1,
-            options=options,
-            custom_id="kick_select"
+            options=options
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -47,7 +35,25 @@ class KickSelect(discord.ui.Select):
 class KickView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=30)
-        self.add_item(KickSelect())
+
+        # 🔥 每次開啟都重新生成（關鍵修正）
+        options = [
+            discord.SelectOption(
+                label=str(uid),
+                value=str(uid)
+            )
+            for uid in queue.data["queue"][:25]
+        ]
+
+        if not options:
+            options = [
+                discord.SelectOption(
+                    label="（目前沒有玩家）",
+                    value="0"
+                )
+            ]
+
+        self.add_item(KickSelect(options))
 
 
 # =========================
@@ -64,7 +70,7 @@ class QueueView(discord.ui.View):
     @discord.ui.button(label="🟢 加入", style=discord.ButtonStyle.green)
     async def join(self, interaction, button):
 
-        r = queue.add_player(interaction.user.id)
+        queue.add_player(interaction.user.id)
 
         await interaction.response.send_message("✅ 已加入", ephemeral=True)
 
@@ -100,11 +106,9 @@ class QueueView(discord.ui.View):
         if not interaction.user.guild_permissions.administrator:
             return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
-        view = KickView()
-
         await interaction.response.send_message(
             "選擇要踢出的玩家：",
-            view=view,
+            view=KickView(),
             ephemeral=True
         )
 
