@@ -1,45 +1,99 @@
 import discord
-from discord import app_commands
+from discord.ext import commands
+import os
+import asyncio
 
-# =========================
-# HELP
-# =========================
+from queue_manager import QueueManager
+from views import QueueView
+from embeds import build_embed
+
+
+# =====================
+# BOT INIT（一定要最上面）
+# =====================
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+queue = QueueManager()
+queue_view = None
+
+
+# =====================
+# READY
+# =====================
+@bot.event
+async def on_ready():
+    global queue_view
+
+    print(f"✅ Logged in as {bot.user}")
+
+    # ⭐ View 必須在這裡建立（避免 event loop error）
+    queue_view = QueueView(queue)
+
+    bot.add_view(queue_view)
+
+    try:
+        await bot.tree.sync()
+        print("✅ Slash commands synced")
+    except Exception as e:
+        print("❌ sync error:", e)
+
+
+# =====================
+# UI UPDATE
+# =====================
+async def update_panel():
+
+    if not queue.data["message_id"]:
+        return
+
+    channel = bot.get_channel(queue.data["channel_id"])
+    if not channel:
+        return
+
+    try:
+        msg = await channel.fetch_message(queue.data["message_id"])
+        await msg.edit(embed=build_embed(queue), view=queue_view)
+    except Exception as e:
+        print("update error:", e)
+
+
+# =====================
+# AUTO UPDATE WRAPPER
+# =====================
+def wrap(func):
+    def inner(*args, **kwargs):
+        result = func(*args, **kwargs)
+        try:
+            asyncio.get_running_loop().create_task(update_panel())
+        except:
+            pass
+        return result
+    return inner
+
+
+queue.add_player = wrap(queue.add_player)
+queue.remove_player = wrap(queue.remove_player)
+queue.finish_run = wrap(queue.finish_run)
+queue.kick_player = wrap(queue.kick_player)
+
+
+# =====================
+# SLASH COMMANDS
+# =====================
+
 @bot.tree.command(name="help", description="顯示所有指令")
 async def help_cmd(interaction: discord.Interaction):
 
-    embed = discord.Embed(
-        title="📌 RO 排隊系統指令",
-        color=discord.Color.green()
+    await interaction.response.send_message(
+        "🟢 /join 加入\n🔴 /leave 離開\n🏁 /finish 副本\n👢 /kick 踢人",
+        ephemeral=True
     )
 
-    embed.add_field(
-        name="🟢 玩家指令",
-        value=(
-            "/join 加入排隊\n"
-            "/leave 離開排隊\n"
-            "/status 查看狀態"
-        ),
-        inline=False
-    )
 
-    embed.add_field(
-        name="👑 管理員",
-        value=(
-            "/setup 建立面板\n"
-            "/kick 踢人\n"
-            "/lock 鎖房\n"
-            "/unlock 解鎖\n"
-            "/grant 授權管理員"
-        ),
-        inline=False
-    )
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-# =========================
-# JOIN
-# =========================
 @bot.tree.command(name="join", description="加入排隊")
 async def join(interaction: discord.Interaction):
 
@@ -55,38 +109,34 @@ async def join(interaction: discord.Interaction):
     await interaction.response.send_message("✅ 已加入", ephemeral=True)
 
 
-# =========================
-# LEAVE
-# =========================
 @bot.tree.command(name="leave", description="離開排隊")
 async def leave(interaction: discord.Interaction):
 
     queue.remove_player(interaction.user.id)
-
     await interaction.response.send_message("✅ 已離開", ephemeral=True)
 
 
-# =========================
-# STATUS
-# =========================
-@bot.tree.command(name="status", description="查看排隊狀態")
-async def status(interaction: discord.Interaction):
+@bot.tree.command(name="finish", description="完成副本（3人）")
+async def finish(interaction: discord.Interaction):
 
-    members = queue.data["members"]
-    current = queue.get_current_group()
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ 無權限", ephemeral=True)
 
-    await interaction.response.send_message(
-        f"👥 人數：{len(members)}/25\n"
-        f"🎮 副本中：{current}",
-        ephemeral=True
-    )
+    queue.finish_run()
+    await interaction.response.send_message("🏁 已推進 3 人", ephemeral=True)
 
 
-# =========================
-# SETUP（管理員）
-# =========================
+@bot.tree.command(name="kick", description="踢人")
+async def kick(interaction: discord.Interaction, user: discord.Member):
+
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ 無權限", ephemeral=True)
+
+    queue.kick_player(user.id)
+    await interaction.response.send_message(f"👢 已踢 {user.display_name}", ephemeral=True)
+
+
 @bot.tree.command(name="setup", description="建立排隊面板")
-@app_commands.checks.has_permissions(administrator=True)
 async def setup(interaction: discord.Interaction):
 
     msg = await interaction.channel.send(
@@ -97,53 +147,15 @@ async def setup(interaction: discord.Interaction):
     queue.data["message_id"] = msg.id
     queue.data["channel_id"] = interaction.channel.id
 
-    await interaction.response.send_message("✅ 面板已建立", ephemeral=True)
+    await interaction.response.send_message("✅ 已建立面板", ephemeral=True)
 
 
-# =========================
-# KICK（管理員）
-# =========================
-@bot.tree.command(name="kick", description="踢人")
-@app_commands.checks.has_permissions(administrator=True)
-async def kick(interaction: discord.Interaction, user: discord.Member):
+# =====================
+# RUN
+# =====================
+TOKEN = os.getenv("DISCORD_TOKEN")
 
-    queue.kick_player(user.id)
+if not TOKEN:
+    raise RuntimeError("❌ DISCORD_TOKEN 沒設定")
 
-    await interaction.response.send_message(f"👢 已踢出 {user.display_name}", ephemeral=True)
-
-
-# =========================
-# LOCK
-# =========================
-@bot.tree.command(name="lock", description="鎖房")
-@app_commands.checks.has_permissions(administrator=True)
-async def lock(interaction: discord.Interaction):
-
-    queue.lock()
-    await interaction.response.send_message("🔒 已鎖房", ephemeral=True)
-
-
-# =========================
-# UNLOCK
-# =========================
-@bot.tree.command(name="unlock", description="解鎖房間")
-@app_commands.checks.has_permissions(administrator=True)
-async def unlock(interaction: discord.Interaction):
-
-    queue.unlock()
-    await interaction.response.send_message("🔓 已解鎖", ephemeral=True)
-
-
-# =========================
-# GRANT ADMIN
-# =========================
-@bot.tree.command(name="grant", description="授權房間管理員")
-@app_commands.checks.has_permissions(administrator=True)
-async def grant(interaction: discord.Interaction, user: discord.Member):
-
-    queue.add_room_admin(user.id)
-
-    await interaction.response.send_message(
-        f"👑 已授權 {user.display_name}",
-        ephemeral=True
-    )
+bot.run(TOKEN)
