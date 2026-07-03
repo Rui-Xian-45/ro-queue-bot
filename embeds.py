@@ -3,11 +3,10 @@ import discord
 def build_embed(queue, guild):
 
     members = queue.data["members"]
-    i = queue.data["current_index"]
 
-    current = members[i:i+3]
-    next_group = members[i+3:i+6]
-    waiting = members[i+6:]
+    current = members[:3]
+    next_group = members[3:6]
+    waiting = members[6:]
 
     def get_name(uid):
         member = guild.get_member(uid)
