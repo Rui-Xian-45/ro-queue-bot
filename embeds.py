@@ -9,23 +9,13 @@ def build_embed(queue, guild):
     next_group = members[i+3:i+6]
     waiting = members[i+6:]
 
-    def player_name(uid):
+    def get_name(uid):
         member = guild.get_member(uid)
-        if member:
-            return member.display_name
-        return str(uid)
+        return member.display_name if member else str(uid)
 
-    current_text = "\n".join(
-        f"• {player_name(uid)}" for uid in current
-    ) if current else "（無）"
-
-    next_text = "\n".join(
-        f"• {player_name(uid)}" for uid in next_group
-    ) if next_group else "（無）"
-
-    waiting_text = "\n".join(
-        f"• {player_name(uid)}" for uid in waiting
-    ) if waiting else "（無）"
+    current_text = "\n".join(get_name(uid) for uid in current) if current else "（無）"
+    next_text = "\n".join(get_name(uid) for uid in next_group) if next_group else "（無）"
+    waiting_text = "\n".join(get_name(uid) for uid in waiting) if waiting else "（無）"
 
     embed = discord.Embed(
         title="⚔ RO 副本排隊系統",
