@@ -1,15 +1,15 @@
 class QueueManager:
+
     def __init__(self):
         self.data = {
             "members": [],
             "locked": False,
-            "current_index": 0,
             "message_id": None,
             "channel_id": None,
         }
 
     # =====================
-    # 加入
+    # 加入排隊
     # =====================
     def add_player(self, user_id):
 
@@ -26,43 +26,44 @@ class QueueManager:
         return "ok"
 
     # =====================
-    # 離開
+    # 離開排隊
     # =====================
     def remove_player(self, user_id):
+
         if user_id in self.data["members"]:
             self.data["members"].remove(user_id)
 
     # =====================
-    # 踢人
+    # 踢除玩家
     # =====================
     def kick_player(self, user_id):
-        self.remove_player(user_id)
+
+        if user_id in self.data["members"]:
+            self.data["members"].remove(user_id)
+            return True
+
+        return False
 
     # =====================
-    # 3人副本
+    # 完成副本（移除前三位）
     # =====================
-    def get_current_group(self):
-        i = self.data["current_index"]
-        return self.data["members"][i:i+3]
-
-    
-
     def finish_run(self):
 
-        members = self.data["members"]
-        i = self.data["current_index"]
+        # 沒有人
+        if not self.data["members"]:
+            return
 
-        self.data["current_index"] += 3
+        # 移除副本中的前三人
+        del self.data["members"][:3]
 
-        if self.data["current_index"] >= len(members):
-            self.data["current_index"] = len(members)
-
-    
     # =====================
-    # lock
+    # 鎖房
     # =====================
     def lock(self):
         self.data["locked"] = True
 
+    # =====================
+    # 解鎖
+    # =====================
     def unlock(self):
         self.data["locked"] = False
