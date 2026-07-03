@@ -7,16 +7,53 @@ def build_embed(queue, guild):
 
     current = members[i:i+3]
     next_group = members[i+3:i+6]
+    waiting = members[i+6:]
 
-    def name(uid):
+    def player_name(uid):
         member = guild.get_member(uid)
-        return member.mention if member else f"<@{uid}>"
+        if member:
+            return member.display_name
+        return str(uid)
 
-    return discord.Embed(
+    current_text = "\n".join(
+        f"• {player_name(uid)}" for uid in current
+    ) if current else "（無）"
+
+    next_text = "\n".join(
+        f"• {player_name(uid)}" for uid in next_group
+    ) if next_group else "（無）"
+
+    waiting_text = "\n".join(
+        f"• {player_name(uid)}" for uid in waiting
+    ) if waiting else "（無）"
+
+    embed = discord.Embed(
         title="⚔ RO 副本排隊系統",
-        description=
-        f"👥 人數：{len(members)}/25\n\n"
-        f"🎮 副本中：{' '.join([name(u) for u in current]) if current else '空'}\n\n"
-        f"➡ 下一組：{' '.join([name(u) for u in next_group]) if next_group else '空'}",
         color=discord.Color.green()
     )
+
+    embed.add_field(
+        name="👥 排隊人數",
+        value=f"{len(members)}/25",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎮 副本中",
+        value=current_text,
+        inline=False
+    )
+
+    embed.add_field(
+        name="⏭ 下一組",
+        value=next_text,
+        inline=False
+    )
+
+    embed.add_field(
+        name="🕒 等候中",
+        value=waiting_text,
+        inline=False
+    )
+
+    return embed
