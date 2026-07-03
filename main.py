@@ -168,8 +168,7 @@ async def leave(interaction: discord.Interaction):
         "✅ 已離開",
         ephemeral=True
     )
-
-# =====================
+    # =====================
 # FINISH（修正版）
 # =====================
 @bot.tree.command(
